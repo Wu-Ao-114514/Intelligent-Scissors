@@ -1,65 +1,127 @@
-# Intelligent Scissors 项目分析
+# Intelligent Scissors Project Analysis
 
-## 1. 项目概览
-该项目位于 `untitled/src/project`，实现了一个基于 Live-Wire 思想的半自动图像分割工具（智能剪刀）。
+## 1. Project Overview
+This project, located in `untitled/src/project`, implements a semi-automatic image segmentation tool based on the Live-Wire (Intelligent Scissors) paradigm.
 
-核心流程：
-1. 用户选择图片并加载到界面。
-2. 在图像上点击第一个种子点。
-3. 鼠标移动时实时显示从最后种子点到光标位置的最优路径（红线）。
-4. 点击固定路径段（青色），继续下一个点。
-5. 点击起始点附近闭合轮廓，提取区域到新窗口。
+Primary workflow:
+1. The user selects and loads an image.
+2. The first seed point is placed on the image.
+3. As the mouse moves, the optimal path from the latest seed to the cursor is rendered in real time.
+4. Clicking confirms the current segment and continues contour construction.
+5. Clicking near the initial seed closes the contour and extracts the selected region.
 
-## 2. 模块职责
+## 2. Module Responsibilities
 
 ### 2.1 `IntelligentScissors`
-- 应用入口。
-- 负责文件选择、图像加载、主窗口与控件（滑块）初始化。
-- 创建并托管 `ImagePanel`。
+- Application entry point.
+- Handles file selection, image loading, and main window initialization.
+- Creates and hosts the `ImagePanel`.
 
 ### 2.2 `GradientCalculator`
-- 提供静态方法 `computeGradient(BufferedImage img)`。
-- 使用 Sobel 核计算图像梯度幅值矩阵，作为路径代价的基础。
+- Provides the static method `computeGradient(BufferedImage img)`.
+- Computes Sobel gradient magnitude used as the cost signal for path optimization.
 
 ### 2.3 `ImagePanel`
-- 交互核心：监听鼠标、维护种子点、实时绘制路径。
-- 算法核心：以最后种子点为源点执行 Dijkstra，构建最短路径树。
-- 功能扩展：光标捕捉（snap radius）和虚拟路径冷却（自动加种子）。
+- Interaction core: mouse handling, seed management, and path rendering.
+- Algorithmic core: runs Dijkstra from the latest seed to build shortest-path trees.
+- Advanced behavior: cursor snapping and virtual-seed cooling for reduced manual effort.
 
-## 3. 关键算法
+## 3. Core Algorithms
 
-### 3.1 Sobel 梯度
-- 在每个像素邻域做 3x3 卷积，计算 $G_x, G_y$。
-- 梯度幅值为：$\sqrt{G_x^2 + G_y^2}$。
-- 时间复杂度近似为 $O(W \times H)$。
+### 3.1 Sobel Gradient Estimation
+- Applies 3x3 Sobel kernels to estimate $G_x$ and $G_y$ at each pixel.
+- Uses gradient magnitude $\sqrt{G_x^2 + G_y^2}$ as edge strength.
+- Time complexity is approximately $O(W \times H)$.
 
-### 3.2 Dijkstra 最短路径
-- 图像像素视作图节点，8 邻域连边。
-- 采用优先队列实现，单次复杂度约为 $O(E \log V)$。
-- 成本函数与梯度相关：边缘越明显，代价越低，路径更容易“贴边”。
+### 3.2 Dijkstra Shortest Path
+- Treats image pixels as graph vertices with 8-neighborhood connectivity.
+- Uses a priority queue implementation with complexity approximately $O(E \log V)$ per run.
+- Cost is inversely related to gradient strength so paths naturally align to strong boundaries.
 
-## 4. 交互设计亮点
-- 实时活线反馈：鼠标移动时动态显示路径。
-- 光标捕捉：在半径内寻找更强边缘点，提升贴边效果。
-- 自动种子：通过路径重叠和距离阈值自动固化路径，减少用户点击次数。
+### 3.3 Cost Function and Relaxation Rule (Report-Aligned)
 
-## 5. 已处理的兼容性问题
-为了保证在当前 JDK 1.8 环境可运行，已完成以下修复：
+The concrete edge cost between neighboring pixels follows:
 
-1. `IntelligentScissors` 中将 lambda 参数名 `_` 修改为 `event`（避免保留标识符冲突）。
-2. `ImagePanel` 中将 `List` 上的 `getFirst/getLast/addFirst` 替换为 Java 8 兼容写法（索引访问与 `add(0, ...)`）。
-3. 编译时显式使用 UTF-8 编码，避免中文注释触发 GBK 编码错误。
+$$
+	ext{weight}(p, q)=\frac{1}{1+\frac{G(p)+G(q)}{2}}
+$$
 
-## 6. 本地运行方式
-在 `untitled/src` 目录执行：
+Diagonal transitions apply geometric correction:
+
+$$
+	ext{cost}_{diag}=\text{weight}\cdot\sqrt{2}
+$$
+
+Relaxation is performed with:
+
+$$
+	ext{newDist}=\text{dist}[x][y]+\text{cost}
+$$
+
+If `newDist < dist[nx][ny]`, the algorithm updates:
+
+- `dist[nx][ny]`
+- `parentX[nx][ny] = x`
+- `parentY[nx][ny] = y`
+
+This yields both shortest distances and a predecessor tree for path reconstruction.
+
+### 3.4 Core Runtime Data Structures
+
+- `dist[x][y]`: shortest known distance from active seed.
+- `parentX[x][y]`, `parentY[x][y]`: predecessor coordinates for backtracking.
+- `PriorityQueue<Node>`: frontier sorted by tentative distance.
+- `dirs`: 8-neighbor offsets for graph expansion.
+
+## 4. Interaction Features
+- Real-time live-wire feedback while moving the cursor.
+- Snap radius to bias cursor targets toward stronger local edges.
+- Automatic virtual seeds based on overlap and distance thresholds to reduce repetitive clicks.
+
+### 4.1 Cursor Snapping Details
+
+In each mouse-move event, the algorithm searches within `snapRadius` around the cursor and chooses the highest-gradient candidate as the path target.
+
+- Adjustable range: `0` to `10`.
+- `0` disables snapping.
+- Higher values improve edge capture for noisy boundaries.
+
+### 4.2 Path Freezing via Virtual Seeds
+
+To reduce manual seed placement frequency, the panel periodically samples virtual paths and compares overlap:
+
+- `INTERVAL = 200 ms`
+- `overlapThreshold = 40`
+- `minDistance = 100`
+
+When overlap criteria are satisfied, a stable endpoint is promoted to a real seed, effectively freezing a reliable contour segment.
+
+## 5. Compatibility Work Completed
+To ensure stable execution under JDK 1.8, the following updates were applied:
+
+1. Replaced lambda parameter name `_` with `event` in `IntelligentScissors`.
+2. Replaced `List` calls such as `getFirst/getLast/addFirst` with Java 8 compatible index-based operations in `ImagePanel`.
+3. Compiled with explicit UTF-8 encoding to avoid character-set related build failures.
+
+## 6. Local Build and Run
+Execute from `untitled/src`:
 
 ```bash
 javac -encoding UTF-8 -source 8 -target 8 project/*.java
 java project.IntelligentScissors
 ```
 
-## 7. 可改进方向
-1. 性能优化：当前每次设种子都会全图 Dijkstra，大图下可能卡顿。
-2. 内存优化：`dist/parentX/parentY` 对高分辨率图像占用较大。
-3. 线程优化：可考虑将耗时路径计算放入后台线程并分离 UI 更新。
-4. 工程化：建议引入 Maven/Gradle、统一入口和测试用例。
+## 7. Recommended Improvements
+1. Performance: full-image Dijkstra recomputation can be expensive for large images.
+2. Memory footprint: `dist`, `parentX`, and `parentY` arrays scale with image resolution.
+3. Responsiveness: offload heavy path computation to a background worker thread.
+4. Project structure: migrate to Maven or Gradle and add automated test coverage.
+
+## 8. Notes from DSAA Report Integration
+
+This markdown has been refined using `DSAA report.docx` and now explicitly captures:
+
+- The exact cost model and relaxation process used in implementation.
+- The practical role of `dist`, parent pointers, and priority queue in shortest-path reconstruction.
+- Design intent of cursor snapping and boundary freezing with concrete parameter values.
+- The interaction objective: accurate contour extraction with fewer user clicks and higher boundary adherence.
