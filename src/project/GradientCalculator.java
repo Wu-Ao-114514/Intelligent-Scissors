@@ -3,45 +3,42 @@ package project;
 import java.awt.image.BufferedImage;
 
 /**
- * 实用类，用于使用 Sobel 滤波器计算图像的梯度。
+ * Utility class for Sobel-based gradient magnitude computation.
  */
 public class GradientCalculator {
     /**
-     * 使用 Sobel 算子的方式计算图像的梯度大小。
-     * 返回一个二维数组表示梯度大小。
+     * Computes gradient magnitude for the input image using Sobel kernels.
      *
-     * @param img 输入的图像
-     * @return 计算得到的梯度大小二维数组
+     * @param img source image
+     * @return 2D gradient magnitude map indexed by [x][y]
      */
     public static double[][] computeGradient(BufferedImage img) {
-        int width = img.getWidth(); // 图像宽度
-        int height = img.getHeight(); // 图像高度
-        double[][] grad = new double[width][height]; // 用于存储梯度值的数组
+        int width = img.getWidth(); // Image width
+        int height = img.getHeight(); // Image height
+        double[][] grad = new double[width][height]; // Gradient magnitude output
 
-        // Sobel 核
-        int[][] sx = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}}; // X 方向 Sobel 核
-        int[][] sy = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}}; // Y 方向 Sobel 核
+        // Sobel kernels
+        int[][] sx = {{-1, 0, 1}, {-2, 0, 2}, {-1, 0, 1}}; // Horizontal gradient kernel
+        int[][] sy = {{-1, -2, -1}, {0, 0, 0}, {1, 2, 1}}; // Vertical gradient kernel
 
-        // 转换为灰度图并计算梯度
-        for (int x = 1; x < width - 1; x++) { // 从 1 到 width-1，避免边界
-            for (int y = 1; y < height - 1; y++) { // 从 1 到 height-1，避免边界
-                double gx = 0, gy = 0; // 初始化 X 和 Y 方向的梯度
-                for (int dx = -1; dx <= 1; dx++) { // 遍历 Sobel 核的 3x3 区域
+        // Convert to luminance and apply convolution on the inner region.
+        for (int x = 1; x < width - 1; x++) { // Skip border pixels
+            for (int y = 1; y < height - 1; y++) { // Skip border pixels
+                double gx = 0, gy = 0; // Accumulate horizontal/vertical responses
+                for (int dx = -1; dx <= 1; dx++) { // Iterate 3x3 neighborhood
                     for (int dy = -1; dy <= 1; dy++) {
-                        int rgb = img.getRGB(x + dx, y + dy); // 获取当前像素的 RGB 值
-                        // 转换为灰度亮度
-                        int r = (rgb >> 16) & 0xFF; // 红色通道
-                        int g = (rgb >> 8) & 0xFF;  // 绿色通道
-                        int b = rgb & 0xFF;         // 蓝色通道
-                        double gray = 0.299 * r + 0.587 * g + 0.114 * b; // 计算灰度值
-                        gx += gray * sx[dy + 1][dx + 1]; // 计算 X 方向的梯度
-                        gy += gray * sy[dy + 1][dx + 1]; // 计算 Y 方向的梯度
+                        int rgb = img.getRGB(x + dx, y + dy); // Source RGB value
+                        int r = (rgb >> 16) & 0xFF; // Red channel
+                        int g = (rgb >> 8) & 0xFF;  // Green channel
+                        int b = rgb & 0xFF;         // Blue channel
+                        double gray = 0.299 * r + 0.587 * g + 0.114 * b; // Luminance
+                        gx += gray * sx[dy + 1][dx + 1]; // Horizontal response
+                        gy += gray * sy[dy + 1][dx + 1]; // Vertical response
                     }
                 }
-                // 计算当前像素的梯度大小
-                grad[x][y] = Math.hypot(gx, gy); // 计算向量的大小
+                grad[x][y] = Math.hypot(gx, gy); // Gradient magnitude
             }
         }
-        return grad; // 返回梯度大小数组
+        return grad; // Final gradient field
     }
 }

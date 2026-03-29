@@ -30,5 +30,8 @@ bin/
 ### Java ###
 *.class
 
+### Temporary analysis artifacts ###
+src/project/docx_extract_tmp/
+
 ### Mac OS ###
 .DS_Store
