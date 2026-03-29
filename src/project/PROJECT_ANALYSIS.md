@@ -117,11 +117,3 @@ java project.IntelligentScissors
 3. Responsiveness: offload heavy path computation to a background worker thread.
 4. Project structure: migrate to Maven or Gradle and add automated test coverage.
 
-## 8. Notes from DSAA Report Integration
-
-This markdown has been refined using `DSAA report.docx` and now explicitly captures:
-
-- The exact cost model and relaxation process used in implementation.
-- The practical role of `dist`, parent pointers, and priority queue in shortest-path reconstruction.
-- Design intent of cursor snapping and boundary freezing with concrete parameter values.
-- The interaction objective: accurate contour extraction with fewer user clicks and higher boundary adherence.
