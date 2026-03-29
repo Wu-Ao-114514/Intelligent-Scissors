@@ -33,5 +33,10 @@ bin/
 ### Temporary analysis artifacts ###
 src/project/docx_extract_tmp/
 
+### Keep repository focused on src/project ###
+src/*
+!src/project/
+!src/project/**
+
 ### Mac OS ###
 .DS_Store
